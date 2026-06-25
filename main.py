@@ -1250,16 +1250,22 @@ body{
   font-size:48px;
 }
 .status-bubble{
-  position:absolute;top:-38px;left:50%;transform:translateX(-50%);
+  position:absolute;left:calc(100% + 12px);top:50%;transform:translateY(-50%);
   background:#fff;border:2px solid #E8A87C;border-radius:20px;
   padding:4px 12px;white-space:nowrap;font-size:13px;
   box-shadow:0 2px 8px rgba(0,0,0,.1);
   opacity:0;transition:opacity .3s;pointer-events:none;
 }
 .status-bubble.show{opacity:1}
+/* 左侧三角边框层 */
+.status-bubble::before{
+  content:'';position:absolute;right:100%;top:50%;transform:translateY(-50%);
+  border:7px solid transparent;border-right-color:#E8A87C;
+}
+/* 左侧三角填充层（白色，盖住边框颜色） */
 .status-bubble::after{
-  content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
-  border:4px solid transparent;border-top-color:#E8A87C;
+  content:'';position:absolute;right:calc(100% - 3px);top:50%;transform:translateY(-50%);
+  border:5px solid transparent;border-right-color:#fff;
 }
 
 /* progress capsules */
