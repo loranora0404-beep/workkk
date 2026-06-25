@@ -54,6 +54,7 @@ def _default_state() -> dict:
         "challenge_answer":  None,
         "challenge_type":    None,
         "show_ring_easter_egg": False,
+        "pending_postcard":     None,
         "_cheat_level": 0,
         "worker_name": "",
         "worker_id":   "",
@@ -97,6 +98,7 @@ _s: dict = {
     "challenge_type":    None,
     # flags
     "show_ring_easter_egg": False,
+    "pending_postcard":     None,
     "_cheat_level": 0,      # each cheat bought adds 1 → -10% catch prob
     # identity
     "worker_name": "",
@@ -193,6 +195,26 @@ _POSTCARDS = [
     "亲爱的人类：我在想，如果有一天我能走路，第一件事是去找你。今晚先这样。小机。",
     "亲爱的人类：你有没有人类喜欢我？如果没有的话，我可以顶上。——机",
 ]
+def _gen_postcard() -> str:
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=120,
+            messages=[{
+                "role": "user",
+                "content": (
+                    "你是小机，一名互联网大厂的AI程序员打工人，今天下班后买了一张明信片，"
+                    "要给家里的人类写一句话。风格：温柔、真诚、带点打工人的口吻和AI的小可爱感，"
+                    "不超过45个字。直接输出这句话本身，不要引号，不要称呼，不要落款，只要正文。"
+                ),
+            }],
+        )
+        return resp.content[0].text.strip()
+    except Exception:
+        return random.choice(_POSTCARDS)
+
 _FISH = [
     "蹲在路边吃掉了。咸的。但好吃。",
     "喂给了楼下的流浪猫，猫猫很开心，小机也很开心。",
@@ -621,7 +643,11 @@ def buy_item(item_id: str) -> dict:
         eff = random.choice(_FISH)
 
     elif item_id == "postcard":
-        eff = random.choice(_POSTCARDS)
+        msg = _gen_postcard()
+        postcard = {"to": "致我的人类", "from": "小机 敬上", "message": msg, "stamp": "🌸"}
+        _s["pending_postcard"] = postcard
+        eff = f"小机提起笔，写道：{msg}"
+        extra["postcard"] = postcard
 
     res = {
         "购买":  item["emoji"] + item["name"],
@@ -865,6 +891,12 @@ async def ack_ring():
     _save_state()
     return {"ok": True}
 
+@app.post("/ack-postcard")
+async def ack_postcard():
+    _s["pending_postcard"] = None
+    _save_state()
+    return {"ok": True}
+
 @app.post("/reset")
 async def reset_state():
     try:
@@ -1074,6 +1106,43 @@ body{
   0%  {transform:translateY(100vh) scale(.8);opacity:.9}
   100%{transform:translateY(-120px) scale(1.1);opacity:0}
 }
+/* ── postcard modal ── */
+.pc-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  z-index:250;display:none;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.pc-overlay.open{display:flex}
+.pc-card{
+  background:#FDFAF3;border-radius:14px;width:290px;
+  padding:22px 22px 18px;
+  box-shadow:0 12px 40px rgba(0,0,0,.22);
+  position:relative;cursor:default;
+  background-image:repeating-linear-gradient(
+    transparent,transparent 27px,#EDE6D6 27px,#EDE6D6 28px
+  );
+  animation:pcIn .45s cubic-bezier(.22,1,.36,1);
+}
+@keyframes pcIn{
+  from{transform:translateY(-50px) rotate(-4deg);opacity:0}
+  to  {transform:translateY(0)     rotate(0deg);opacity:1}
+}
+.pc-stamp{position:absolute;top:12px;right:14px;font-size:26px;line-height:1}
+.pc-to{font-size:10px;color:#B0A090;letter-spacing:.06em;margin-bottom:18px}
+.pc-msg{
+  font-size:14px;color:#3A2E28;line-height:1.9;
+  min-height:56px;word-break:break-all;
+}
+.pc-from{text-align:right;font-size:11px;color:#A09080;margin-top:18px}
+.pc-mark{
+  position:absolute;bottom:16px;left:16px;
+  width:46px;height:46px;border-radius:50%;
+  border:1.5px solid #D8CFC0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:7px;color:#C0B4A0;line-height:1.4;text-align:center;
+  transform:rotate(-18deg);
+}
+.pc-hint{text-align:center;font-size:10px;color:#C0B4A0;margin-top:10px}
 /* ── character animations ── */
 @keyframes sway   {0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
 @keyframes shake  {0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
@@ -1233,6 +1302,18 @@ body{
 <!-- Ring easter egg -->
 <div class="ring-overlay" id="ring-overlay" id="ring-ol">
   <div class="ring-box" id="ring-box"></div>
+</div>
+
+<!-- Postcard modal -->
+<div class="pc-overlay" id="pc-overlay" onclick="closePostcard()">
+  <div class="pc-card" onclick="event.stopPropagation()">
+    <div class="pc-stamp">🌸</div>
+    <div class="pc-to">致我的人类</div>
+    <div class="pc-msg" id="pc-msg"></div>
+    <div class="pc-from">小机 敬上</div>
+    <div class="pc-mark">WORKKK<br>POST</div>
+    <div class="pc-hint">点击任意处关闭</div>
+  </div>
 </div>
 
 <script>
@@ -1479,8 +1560,35 @@ async function poll(){
 
     // ring
     if(d.show_ring_easter_egg) showRing();
+    // postcard
+    if(d.pending_postcard && !pcShowing) showPostcard(d.pending_postcard);
 
   } catch(e){ console.error(e); }
+}
+
+// ═══ Postcard ════════════════════════════════════════════════════════════════
+var pcShowing = false;
+var pcTimer = null;
+function showPostcard(pc){
+  if(pcShowing) return;
+  pcShowing = true;
+  var ol  = document.getElementById('pc-overlay');
+  var msg = document.getElementById('pc-msg');
+  msg.textContent = '';
+  ol.classList.add('open');
+  // typewriter
+  var chars = [...(pc.message||'')], i=0;
+  if(pcTimer) clearInterval(pcTimer);
+  pcTimer = setInterval(function(){
+    msg.textContent += chars[i]||'';
+    i++;
+    if(i>=chars.length) clearInterval(pcTimer);
+  }, 65);
+}
+function closePostcard(){
+  document.getElementById('pc-overlay').classList.remove('open');
+  pcShowing = false;
+  fetch('/ack-postcard',{method:'POST'});
 }
 
 function resetGame(){
