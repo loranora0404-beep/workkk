@@ -356,7 +356,9 @@ nginx -t && systemctl reload nginx
 | `GET /shop` | 商店商品列表 |
 | `POST /mcp` | MCP Streamable HTTP |
 | `GET /mcp` | MCP SSE |
-| `GET /.well-known/oauth-authorization-server` | OAuth 元数据 |
+| `GET /.well-known/oauth-protected-resource` | OAuth 受保护资源元数据（RFC 9728）|
+| `GET /.well-known/oauth-protected-resource/mcp` | OAuth 受保护资源元数据（/mcp 后缀，兼容 Claude.ai）|
+| `GET /.well-known/oauth-authorization-server` | OAuth 授权服务器元数据 |
 | `POST /oauth/register` | 动态客户端注册 |
 | `GET /oauth/authorize` | 授权端点 |
 | `POST /oauth/token` | Token 端点 |
