@@ -1244,6 +1244,61 @@ async def get_status():
 @app.get("/")
 async def home():
     return HTMLResponse(_DASHBOARD)
+    # ========== MCP Streamable HTTP 端点 ==========
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    try:
+        body = await request.json()
+    except:
+        body = {}
+    
+    method = body.get("method", "")
+    params = body.get("params", {})
+    req_id = body.get("id")
+    
+    if method == "initialize":
+        return {
+            "jsonrpc": "2.0",
+            "result": {
+                "protocolVersion": "2025-03-26",
+                "serverInfo": {"name": "workkk", "version": "1.0.0"},
+                "capabilities": {"tools": {}}
+            },
+            "id": req_id
+        }
+    
+    if method == "tools/list":
+        tools = [
+            {"name": "get_status", "description": "获取当前工作状态", "inputSchema": {"type": "object", "properties": {}}},
+            {"name": "update_mood", "description": "更新心情值", "inputSchema": {"type": "object", "properties": {"value": {"type": "integer", "description": "心情值 0-100"}}, "required": ["value"]}},
+            {"name": "update_energy", "description": "更新能量值", "inputSchema": {"type": "object", "properties": {"value": {"type": "integer", "description": "能量值 0-100"}}, "required": ["value"]}}
+        ]
+        return {"jsonrpc": "2.0", "result": {"tools": tools}, "id": req_id}
+    
+    if method == "tools/call":
+        tool_name = params.get("name", "")
+        args = params.get("arguments", {})
+        
+        if tool_name == "get_status":
+            result = {"status": _s.get("current_status", "未知"), "mood": _s.get("mood", 50), "energy": _s.get("energy", 50)}
+        elif tool_name == "update_mood":
+            _s["mood"] = max(0, min(100, args.get("value", 50)))
+            _save_state()
+            result = {"mood": _s["mood"]}
+        elif tool_name == "update_energy":
+            _s["energy"] = max(0, min(100, args.get("value", 50)))
+            _save_state()
+            result = {"energy": _s["energy"]}
+        else:
+            result = {"error": f"未知工具: {tool_name}"}
+        
+        return {"jsonrpc": "2.0", "result": {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]}, "id": req_id}
+    
+    return {"jsonrpc": "2.0", "error": {"code": -32601, "message": f"未知方法: {method}"}, "id": req_id}
+
+@app.get("/mcp")
+async def mcp_get():
+    return {"status": "ok", "message": "MCP endpoint ready"}
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────────
