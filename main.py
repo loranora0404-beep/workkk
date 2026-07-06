@@ -1068,6 +1068,8 @@ def _base(req: Request) -> str:
     return str(req.base_url).rstrip("/")
 
 def _auth(req: Request) -> None:
+    if req.url.path == "/mcp":    
+        return 
     h = req.headers.get("Authorization", "")
     if not h.startswith("Bearer "):
         raise HTTPException(401, "Unauthorized",
